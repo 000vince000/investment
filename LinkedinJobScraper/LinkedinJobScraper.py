@@ -7,6 +7,7 @@ from enum import Enum
 import time
 from sympy import fibonacci
 import pandas as pd
+import duckdb
 
 class DebugLevel(Enum):
     WARN = 0
@@ -16,6 +17,8 @@ class DebugLevel(Enum):
 class Constants:
 
     # Configurations
+    db_name = 'linkedin_jobs.db'
+    table_name = 'jobs'
     base_url_prefix = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=software%20engineer%20OR%20engineering%20manager&location=United%2BStates&geoId=103644278&trk=public_jobs_jobs-search-bar_search-submit&start="
     staff_url_postfix = "/people/?facetCurrentFunction=8&facetGeoRegion=103644278"
     suffix_to_remove = "?trk=public_jobs_jserp-result_job-search-card-subtitle"
@@ -37,6 +40,36 @@ class Constants:
 jobs = {}  # updated cache, won't be written back to csv
 jobs_to_add = []  # write-back as additions, strictly as a write buffer
 #company_staff_urls = {}
+
+def create_table_and_insert_csv(db_name, table_name, csv_file):
+    # Connect to the database (or create it if it doesn't exist)
+    conn = duckdb.connect(db_name)
+
+    # Read the CSV file to get column names and data types
+    with open(csv_file, 'r') as f:
+        csv_reader = csv.reader(f)
+        headers = next(csv_reader)  # Get the first row (headers)
+
+    # Create the table if it doesn't exist
+    create_table_query = f"""
+    CREATE TABLE IF NOT EXISTS {table_name} (
+        {', '.join([f"{header} VARCHAR" for header in headers])}
+        , PRIMARY KEY (job_id)
+    )
+    """
+    conn.execute(create_table_query)
+
+    # Import CSV data into the table
+    import_query = f"""
+    INSERT INTO {table_name}
+    SELECT * FROM read_csv_auto('{csv_file}', header=true, sample_size=-1)
+    ON CONFLICT (job_id) DO UPDATE SET
+    {', '.join([f"{header} = excluded.{header}" for header in headers if header != 'job_id'])}
+    """
+    conn.execute(import_query)
+
+    conn.commit()
+    conn.close()
 
 def is_ignored(company):
     c = Constants()
