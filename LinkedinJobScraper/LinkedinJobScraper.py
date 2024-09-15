@@ -28,7 +28,7 @@ class Constants:
     csv_columns = ['job_id', 'company', 'job_type', 'title', 'location', 'link', 'date']
     debug_level = None
     debug_company = ""
-    ignore_list = ["SynergisticIT", "Kforce Inc", "ICONMA", "Team Remotely Inc", "Ampcus Inc", "Genesis10", "Intellectt Inc", "Stealth", "LanceSoft, Inc.", "Insight Global", "Griffin Global Systems, Inc.", "EVONA", "Steneral Consulting", "TALENT Software Services", "Avid Technology Professionals"]
+    ignore_list = ["SynergisticIT", "Kforce Inc", "ICONMA", "Team Remotely Inc", "Ampcus Inc", "Genesis10", "Intellectt Inc", "Stealth", "LanceSoft, Inc.", "Insight Global", "Griffin Global Systems, Inc.", "EVONA", "Steneral Consulting", "TALENT Software Services", "Avid Technology Professionals","Engtal"]
     ignore_words = ["Job", "Recruit", "Career", "Hire", "Staffing", "Work"]
 
 # Global mutable variables
