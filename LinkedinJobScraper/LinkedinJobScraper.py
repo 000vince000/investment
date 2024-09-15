@@ -8,6 +8,7 @@ from sympy import fibonacci
 import pandas as pd
 import duckdb
 from tabulate import tabulate
+import argparse
 
 class DebugLevel(Enum):
     WARN = 0
@@ -22,7 +23,7 @@ class Constants:
     staff_url_postfix = "/people/?facetCurrentFunction=8&facetGeoRegion=103644278"
     suffix_to_remove = "?trk=public_jobs_jserp-result_job-search-card-subtitle"
     row_increment_default = 10
-    max_row_default = 0
+    max_row_default = 2000
     EM_AS_ENG_MULTIPLIER = 3
     csv_name = "linkedin-job-scraper-database.csv"
     csv_columns = ['job_id', 'company', 'job_type', 'title', 'location', 'link', 'date']
@@ -216,41 +217,64 @@ def analyze_data(conn):
             SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY total_count) as p95
             FROM total_counts
         )
-        SELECT company, total_count, max_date, min_date
-        FROM total_counts, percentile
-        WHERE total_count > p95
-        ORDER BY total_count DESC
+        SELECT 
+            tc.company, 
+            tc.total_count, 
+            tc.max_date, 
+            tc.min_date,
+            eh.headcount,
+            CASE 
+                WHEN eh.headcount IS NOT NULL AND eh.headcount > 0 
+                THEN CAST(tc.total_count AS FLOAT) / eh.headcount * 100
+                ELSE NULL 
+            END as job_to_headcount_ratio
+        FROM total_counts tc
+        LEFT JOIN engineering_headcounts eh ON tc.company = eh.company
+        CROSS JOIN percentile
+        WHERE tc.total_count > p95
+        ORDER BY tc.total_count DESC
         """
         result = conn.execute(analysis_query).fetchall()
         print("Top companies by job count:")
         
         # Prepare data for tabulate
-        table_data = [[row[0], row[1], row[2], row[3]] for row in result]
-        headers = ["Company", "Total Count", "Latest Date", "Earliest Date"]
+        table_data = [
+            [
+                row[0],  # Company
+                row[1],  # Total Count
+                row[2],  # Latest Date
+                row[3],  # Earliest Date
+                row[4] if row[4] is not None else 'N/A',  # Headcount
+                f"{row[5]:.2f}%" if row[5] is not None else 'N/A'  # Job to Headcount Ratio
+            ] for row in result
+        ]
+        headers = ["Company", "Total Count", "Latest Date", "Earliest Date", "Eng Headcount", "Job/Headcount Percentage"]
         
         # Print the table
         print(tabulate(table_data, headers=headers, tablefmt="grid"))
     except Exception as e:
         print(f"Error during SQL analysis: {e}")
 
-def main():
+def main(test_mode=False):
     print("Starting the LinkedIn job scraper...")
     
     conn = None
     try:
         conn = setup_database()
-        existing_job_ids = load_existing_jobs(conn)
         
-        jobs_to_add = scrape_linkedin_jobs(conn, existing_job_ids)
-        
-        conn.commit()
-        print(f"{len(jobs_to_add)} jobs added to DuckDB")
+        if not test_mode:
+            existing_job_ids = load_existing_jobs(conn)
+            jobs_to_add = scrape_linkedin_jobs(conn, existing_job_ids)
+            conn.commit()
+            print(f"{len(jobs_to_add)} jobs added to DuckDB")
+        else:
+            print("Test mode: Skipping scraping, proceeding directly to analysis.")
         
         analyze_data(conn)
         
     except Exception as e:
         print(f"An error occurred: {e}")
-        if conn:
+        if conn and not test_mode:
             conn.rollback()
             print("Transaction rolled back due to error.")
     finally:
@@ -261,4 +285,8 @@ def main():
     print("Script execution completed.")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="LinkedIn Job Scraper")
+    parser.add_argument("--test", action="store_true", help="Run in test mode (skip scraping, only analyze)")
+    args = parser.parse_args()
+
+    main(test_mode=args.test)
