@@ -1,5 +1,6 @@
 import duckdb
 import csv
+import os
 
 def create_table_and_insert_csv(db_name, table_name, csv_file):
     # Connect to the database (or create it if it doesn't exist)
@@ -39,9 +40,18 @@ def create_table_and_insert_csv(db_name, table_name, csv_file):
     conn.commit()
     conn.close()
 
-# Usage
-db_name = 'linkedin_jobs.db'
-table_name = 'jobs'
-csv_file = 'linkedin-job-scraper-database.csv'
+def main():
+    db_name = 'linkedin_jobs.db'
+    table_name = 'jobs'
+    csv_file = 'linkedin-job-scraper-database.csv'
 
-create_table_and_insert_csv(db_name, table_name, csv_file)
+    if not os.path.exists(csv_file):
+        print(f"Error: CSV file '{csv_file}' not found.")
+        return
+
+    print(f"Starting import process for '{csv_file}' into '{db_name}'...")
+    create_table_and_insert_csv(db_name, table_name, csv_file)
+    print("Import process completed.")
+
+if __name__ == "__main__":
+    main()
