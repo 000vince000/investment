@@ -123,7 +123,7 @@ def load_existing_jobs(conn):
 
 def scrape_linkedin_jobs(conn, existing_job_ids):
     c = Constants()
-    n = 0  # Start with no sleep
+    n = 1  # Start with no sleep
     i = 0
     jobs_to_add = []
     while i <= c.max_row_default:
@@ -136,7 +136,7 @@ def scrape_linkedin_jobs(conn, existing_job_ids):
             time.sleep(sleep_time)
         
         try:
-            response = requests.get(base_url, headers=c.headers)
+            response = requests.get(base_url)
             print(f"Response status code: {response.status_code}")
 
             if response.status_code == 200:
